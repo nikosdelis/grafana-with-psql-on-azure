@@ -1,0 +1,467 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.28.1.47646",
+      "templateHash": "12494465925638589732"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "env": {
+      "type": "string"
+    },
+    "psqlAdminPassword": {
+      "type": "securestring",
+      "minLength": 12
+    },
+    "grafanaAdminPassword": {
+      "type": "securestring",
+      "minLength": 12
+    },
+    "kvSecretsOwnerId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The object ID of the user or service principal that will have access to the secrets in the key vault"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2024-03-01",
+      "name": "[format('rg-{0}-{1}', parameters('name'), parameters('env'))]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "kv",
+      "resourceGroup": "[format('rg-{0}-{1}', parameters('name'), parameters('env'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[parameters('name')]"
+          },
+          "psqlAdminPassword": {
+            "value": "[parameters('psqlAdminPassword')]"
+          },
+          "grafanaAdminPassword": {
+            "value": "[parameters('grafanaAdminPassword')]"
+          },
+          "kvSecretsOwnerId": {
+            "value": "[parameters('kvSecretsOwnerId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.28.1.47646",
+              "templateHash": "5378586469778932425"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "defaultValue": "grafana"
+            },
+            "psqlAdminPassword": {
+              "type": "securestring"
+            },
+            "grafanaAdminPassword": {
+              "type": "securestring"
+            },
+            "kvSecretsOwnerId": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults",
+              "apiVersion": "2023-07-01",
+              "name": "[format('kv-{0}-{1}', parameters('name'), uniqueString(resourceGroup().id))]",
+              "location": "[resourceGroup().location]",
+              "properties": {
+                "enablePurgeProtection": true,
+                "sku": {
+                  "name": "standard",
+                  "family": "A"
+                },
+                "enabledForDeployment": true,
+                "enabledForTemplateDeployment": true,
+                "tenantId": "[subscription().tenantId]",
+                "accessPolicies": [
+                  {
+                    "objectId": "[parameters('kvSecretsOwnerId')]",
+                    "permissions": {
+                      "secrets": [
+                        "list",
+                        "get"
+                      ]
+                    },
+                    "tenantId": "[subscription().tenantId]"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', format('kv-{0}-{1}', parameters('name'), uniqueString(resourceGroup().id)), 'PSQL-ADMIN-PASSWORD')]",
+              "properties": {
+                "value": "[parameters('psqlAdminPassword')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', format('kv-{0}-{1}', parameters('name'), uniqueString(resourceGroup().id)))]"
+              ]
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2021-06-01-preview",
+              "name": "[format('{0}/{1}', format('kv-{0}-{1}', parameters('name'), uniqueString(resourceGroup().id)), 'GRAFANA-ADMIN-PASSWORD')]",
+              "properties": {
+                "value": "[parameters('grafanaAdminPassword')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', format('kv-{0}-{1}', parameters('name'), uniqueString(resourceGroup().id)))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "generatedName": {
+              "type": "string",
+              "value": "[format('kv-{0}-{1}', parameters('name'), uniqueString(resourceGroup().id))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', format('rg-{0}-{1}', parameters('name'), parameters('env')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "psql",
+      "resourceGroup": "[format('rg-{0}-{1}', parameters('name'), parameters('env'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[parameters('name')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "psqlAdminPassword": {
+            "reference": {
+              "keyVault": {
+                "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}-{1}', parameters('name'), parameters('env'))), 'Microsoft.KeyVault/vaults', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}-{1}', parameters('name'), parameters('env'))), 'Microsoft.Resources/deployments', 'kv'), '2022-09-01').outputs.generatedName.value)]"
+              },
+              "secretName": "PSQL-ADMIN-PASSWORD"
+            }
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.28.1.47646",
+              "templateHash": "9533179656496162118"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "defaultValue": "grafana"
+            },
+            "env": {
+              "type": "string"
+            },
+            "psqlAdminPassword": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[format('{0}/{1}', format('psql-{0}-{1}', parameters('name'), parameters('env')), 'allow-all-azure-internal-IPs')]",
+              "properties": {
+                "startIpAddress": "0.0.0.0",
+                "endIpAddress": "0.0.0.0"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', format('psql-{0}-{1}', parameters('name'), parameters('env')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[format('psql-{0}-{1}', parameters('name'), parameters('env'))]",
+              "location": "[resourceGroup().location]",
+              "sku": {
+                "name": "Standard_B1ms",
+                "tier": "Burstable"
+              },
+              "properties": {
+                "replica": {
+                  "role": "Primary"
+                },
+                "storage": {
+                  "iops": 120,
+                  "tier": "P4",
+                  "storageSizeGB": 32,
+                  "autoGrow": "Disabled"
+                },
+                "network": {
+                  "publicNetworkAccess": "Enabled"
+                },
+                "dataEncryption": {
+                  "type": "SystemManaged"
+                },
+                "authConfig": {
+                  "activeDirectoryAuth": "Disabled",
+                  "passwordAuth": "Enabled"
+                },
+                "version": "16",
+                "administratorLogin": "postgres",
+                "administratorLoginPassword": "[parameters('psqlAdminPassword')]",
+                "backup": {
+                  "backupRetentionDays": 7,
+                  "geoRedundantBackup": "Disabled"
+                },
+                "highAvailability": {
+                  "mode": "Disabled"
+                },
+                "maintenanceWindow": {
+                  "customWindow": "Disabled",
+                  "dayOfWeek": 0,
+                  "startHour": 0,
+                  "startMinute": 0
+                },
+                "replicationRole": "Primary"
+              }
+            },
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[format('{0}/{1}', format('psql-{0}-{1}', parameters('name'), parameters('env')), 'grafana')]",
+              "properties": {
+                "charset": "UTF8",
+                "collation": "en_US.UTF8"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', format('psql-{0}-{1}', parameters('name'), parameters('env')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "generatedName": {
+              "type": "string",
+              "value": "[format('psql-{0}-{1}', parameters('name'), parameters('env'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}-{1}', parameters('name'), parameters('env'))), 'Microsoft.Resources/deployments', 'kv')]",
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', format('rg-{0}-{1}', parameters('name'), parameters('env')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "grafana",
+      "resourceGroup": "[format('rg-{0}-{1}', parameters('name'), parameters('env'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[parameters('name')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "kvName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}-{1}', parameters('name'), parameters('env'))), 'Microsoft.Resources/deployments', 'kv'), '2022-09-01').outputs.generatedName.value]"
+          },
+          "psqlHostname": {
+            "value": "[format('{0}.postgres.database.azure.com', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}-{1}', parameters('name'), parameters('env'))), 'Microsoft.Resources/deployments', 'psql'), '2022-09-01').outputs.generatedName.value)]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.28.1.47646",
+              "templateHash": "8748199399614369993"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "defaultValue": "grafana"
+            },
+            "env": {
+              "type": "string"
+            },
+            "kvName": {
+              "type": "string"
+            },
+            "psqlHostname": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2021-03-01",
+              "name": "[format('asp-{0}-{1}', parameters('name'), parameters('env'))]",
+              "location": "[resourceGroup().location]",
+              "kind": "linux",
+              "sku": {
+                "name": "B1",
+                "tier": "Basic",
+                "size": "B1",
+                "family": "B",
+                "capacity": 1
+              },
+              "properties": {
+                "perSiteScaling": false,
+                "elasticScaleEnabled": false,
+                "maximumElasticWorkerCount": 1,
+                "isSpot": false,
+                "reserved": true,
+                "isXenon": false,
+                "hyperV": false,
+                "zoneRedundant": false
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[format('app-{0}-{1}-{2}', parameters('name'), uniqueString(resourceGroup().id), parameters('env'))]",
+              "location": "[resourceGroup().location]",
+              "kind": "app,linux,container",
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('asp-{0}-{1}', parameters('name'), parameters('env')))]",
+                "siteConfig": {
+                  "numberOfWorkers": 1,
+                  "linuxFxVersion": "DOCKER|registry.hub.docker.com/grafana/grafana:latest",
+                  "acrUseManagedIdentityCreds": false,
+                  "alwaysOn": true,
+                  "http20Enabled": false,
+                  "functionAppScaleLimit": 0,
+                  "minimumElasticInstanceCount": 0,
+                  "appSettings": [
+                    {
+                      "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+                      "value": "false"
+                    },
+                    {
+                      "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+                      "value": ""
+                    },
+                    {
+                      "name": "DOCKER_REGISTRY_SERVER_URL",
+                      "value": "https://registry.hub.docker.com"
+                    },
+                    {
+                      "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+                      "value": ""
+                    },
+                    {
+                      "name": "GF_DATABASE_HOST",
+                      "value": "[parameters('psqlHostname')]"
+                    },
+                    {
+                      "name": "GF_DATABASE_PASSWORD",
+                      "value": "[format('@Microsoft.KeyVault(VaultName={0};SecretName=PSQL-ADMIN-PASSWORD)', parameters('kvName'))]"
+                    },
+                    {
+                      "name": "GF_DATABASE_SSL_MODE",
+                      "value": "require"
+                    },
+                    {
+                      "name": "GF_DATABASE_TYPE",
+                      "value": "postgres"
+                    },
+                    {
+                      "name": "GF_DATABASE_USER",
+                      "value": "postgres"
+                    },
+                    {
+                      "name": "GF_SECURITY_ADMIN_PASSWORD",
+                      "value": "[format('@Microsoft.KeyVault(VaultName={0};SecretName=GRAFANA-ADMIN-PASSWORD)', parameters('kvName'))]"
+                    },
+                    {
+                      "name": "GF_SERVER_ROOT_URL",
+                      "value": "[format('https://app-{0}-{1}-{2}.azurewebsites.net', parameters('name'), uniqueString(resourceGroup().id), parameters('env'))]"
+                    }
+                  ]
+                }
+              },
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', format('asp-{0}-{1}', parameters('name'), parameters('env')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/accessPolicies",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/add', parameters('kvName'))]",
+              "properties": {
+                "accessPolicies": [
+                  {
+                    "objectId": "[reference(resourceId('Microsoft.Web/sites', format('app-{0}-{1}-{2}', parameters('name'), uniqueString(resourceGroup().id), parameters('env'))), '2023-12-01', 'full').identity.principalId]",
+                    "permissions": {
+                      "secrets": [
+                        "get"
+                      ]
+                    },
+                    "tenantId": "[subscription().tenantId]"
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', format('app-{0}-{1}-{2}', parameters('name'), uniqueString(resourceGroup().id), parameters('env')))]"
+              ]
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}-{1}', parameters('name'), parameters('env'))), 'Microsoft.Resources/deployments', 'kv')]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}-{1}', parameters('name'), parameters('env'))), 'Microsoft.Resources/deployments', 'psql')]",
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', format('rg-{0}-{1}', parameters('name'), parameters('env')))]"
+      ]
+    }
+  ]
+}
