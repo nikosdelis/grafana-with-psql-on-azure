@@ -15,8 +15,9 @@ The template deploys the following resources:
 
 - A resource group
 - A Key Vault to store secrets
-- A PostgreSQL server with a firewall rule and a database
-- An App Service Plan and a Web App for the Grafana application
+- A PostgreSQL (B1ms) server with a firewall rule and a database
+- An App Service Plan (B1) and a Web App for the Grafana application
+- Cost ~28USD/month if you deploy it as is
 
 ## Parameters
 
