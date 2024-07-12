@@ -1,4 +1,4 @@
-﻿# Containerized Grafana with PostgreSQL on Azure
+﻿# Grafana Web App with PostgreSQL on Azure
 
 This repository contains the necessary configuration files to deploy a containerized Grafana application with a PostgreSQL database on Azure.
 
