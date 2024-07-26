@@ -87,6 +87,10 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'GF_SERVER_ROOT_URL'
           value: 'https://app-${name}-${uniqueString(resourceGroup().id)}-${env}.azurewebsites.net'
         }
+        {
+          name: 'GF_AZURE_WORKLOAD_IDENTITY_ENABLED'
+          value: 'true'
+        }
       ]
     }
   }
