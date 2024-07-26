@@ -91,6 +91,10 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'GF_AZURE_WORKLOAD_IDENTITY_ENABLED'
           value: 'true'
         }
+        {
+          name: 'GF_AZURE_MANAGED_IDENTITY_ENABLED'
+          value: 'true'
+        }
       ]
     }
   }
